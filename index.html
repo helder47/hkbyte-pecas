@@ -8,52 +8,59 @@
     <style>
         body { font-family: 'Segoe UI', Arial, sans-serif; padding: 15px; background: #f4f6f9; max-width: 500px; margin: auto; color: #333; }
         
-        /* Estilo do Cabeçalho / Logotipo da HKByte */
         .brand-header {
             background: linear-gradient(135deg, #1e3c72, #2a5298);
-            color: white;
-            padding: 18px;
-            border-radius: 10px;
-            text-align: center;
-            margin-bottom: 20px;
+            color: white; padding: 18px; border-radius: 10px; text-align: center; margin-bottom: 20px;
             box-shadow: 0 4px 6px rgba(0,0,0,0.15);
         }
-        .brand-header h1 {
-            margin: 0;
-            font-size: 22px;
-            letter-spacing: 0.5px;
-        }
-        .brand-header p {
-            margin: 5px 0 0 0;
-            font-size: 13px;
-            color: #d0e1fd;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
+        .brand-header h1 { margin: 0; font-size: 22px; }
+        .brand-header p { margin: 5px 0 0 0; font-size: 13px; color: #d0e1fd; text-transform: uppercase; letter-spacing: 1px; }
 
-        .form-group { margin-bottom: 15px; background: #fff; padding: 12px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-        label { display: block; font-weight: bold; margin-bottom: 5px; color: #2c3e50; font-size: 14px;}
-        input { width: 100%; padding: 12px; box-sizing: border-box; font-size: 16px; border: 1px solid #ccc; border-radius: 6px; }
+        .form-group { margin-bottom: 12px; background: #fff; padding: 10px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        label { display: block; font-weight: bold; margin-bottom: 4px; color: #2c3e50; font-size: 13px;}
+        input, select { width: 100%; padding: 10px; box-sizing: border-box; font-size: 15px; border: 1px solid #ccc; border-radius: 6px; }
         input:disabled { background-color: #e9ecef; }
+        
         button { background: #1e3c72; color: white; padding: 14px; border: none; width: 100%; font-size: 16px; font-weight: bold; border-radius: 6px; cursor: pointer; margin-top: 10px; }
-        button#btnExport { background: #27ae60;}
+        button#btnFecharLote { background: #e67e22; }
+        button#btnExport { background: #27ae60; }
         button:disabled { background: #bdc3c7; cursor: not-allowed; }
+        
         #reader { width: 100%; margin: 10px auto; display: none; border-radius: 8px; overflow: hidden; border: 2px solid #1e3c72; }
         .stats { margin-top: 20px; padding: 15px; background: #fff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); text-align: center; }
-        .stats p {font-size: 16px; font-weight: bold; margin-bottom: 10px;}
+        .stats p { font-size: 15px; font-weight: bold; margin-bottom: 10px; }
+
+        /* Estilo da Janela Modal de Fechamento de Lotes */
+        #modalLote {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.7); justify-content: center; align-items: center;
+            padding: 15px; box-sizing: border-box; overflow-y: auto;
+        }
+        .modal-content {
+            background: #fff; padding: 20px; border-radius: 10px;
+            width: 100%; max-width: 450px; max-height: 90vh; overflow-y: auto;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+        .item-check { display: flex; align-items: center; margin-bottom: 8px; font-size: 13px; background: #f8f9fa; padding: 8px; border-radius: 4px; }
+        .item-check input { width: auto; margin-right: 10px; }
     </style>
 </head>
 <body>
 
-    <!-- Logotipo e Identidade Visual HKByte -->
     <div class="brand-header">
         <h1>⚡ HKByte</h1>
-        <p>Controle de Peças e Atendimentos</p>
+        <p>Coleta de Peças em Campo</p>
+    </div>
+
+    <!-- Informação do Técnico -->
+    <div class="form-group">
+        <label>Nome do Técnico:</label>
+        <input type="text" id="tecnico" placeholder="Seu nome completo">
     </div>
 
     <!-- Passo 1: RAT -->
     <div class="form-group">
-        <label>1. Número do RAT:</label>
+        <label>1. Número da RAT:</label>
         <input type="text" id="rat" placeholder="Digite a RAT e toque fora">
     </div>
 
@@ -65,35 +72,65 @@
 
     <!-- Passo 3: Leitura de Serial -->
     <div class="form-group">
-        <label>3. Número de Série (Serial):</label>
+        <label>3. Número de Série (Serial) - Leitura:</label>
         <input type="text" id="serial" placeholder="Aguardando leitura da câmera..." disabled>
     </div>
 
-    <!-- Leitor de QR Code / Código de Barras -->
     <div id="reader"></div>
     
-    <button id="btnSalvar" onclick="salvarLocal()" disabled>Salvar Registro no Celular</button>
+    <button id="btnSalvar" onclick="salvarRegistro()" disabled>Salvar Peça no Histórico</button>
 
     <div class="stats">
-        <p>Registros salvos offline: <span id="contador">0</span></p>
-        <button id="btnExport" onclick="exportarCSV()">Exportar Planilha (CSV)</button>
+        <p>Peças acumuladas: <span id="contador">0</span></p>
+        <button id="btnFecharLote" onclick="abrirModalLote()">📦 Fechar Lotes (Semanal)</button>
         <button id="btnLimpar" onclick="limparDados()" style="background: #e74c3c; margin-top: 8px;">Apagar Histórico</button>
+    </div>
+
+    <!-- Janela Modal para Distribuir os Lotes Fornecidos pela Empresa -->
+    <div id="modalLote">
+        <div class="modal-content">
+            <h3 style="margin-top:0; color:#1e3c72;">Atribuir Lotes da Semana</h3>
+            <p style="font-size: 12px; color: #666;">Informe o lote gerado pela empresa, selecione o tipo e marque as peças que pertencem a ele:</p>
+            
+            <div class="form-group">
+                <label>Número do Lote:</label>
+                <input type="text" id="modalLoteNum" placeholder="Ex: LOTE-9988">
+            </div>
+
+            <div class="form-group">
+                <label>Tipo de Lote:</label>
+                <select id="modalTipoLote">
+                    <option value="USADO">USADO</option>
+                    <option value="NOVA">NOVA</option>
+                    <option value="RMDF">RMDF</option>
+                </select>
+            </div>
+
+            <label style="margin-top: 15px; font-weight: bold; color: #2c3e50;">Selecione as peças deste lote:</label>
+            <div id="listaPecasModal" style="max-height: 180px; overflow-y: auto; border: 1px solid #ccc; padding: 5px; border-radius: 6px; margin-bottom: 10px;">
+                <!-- As peças pendentes aparecem aqui dinamicamente -->
+            </div>
+
+            <button onclick="salvarLoteAtual()" style="background: #27ae60; margin-top:5px;">Vincular Lote e Gerar Planilha</button>
+            <button onclick="fecharModalLote()" style="background: #7f8c8d; margin-top:5px;">Fechar / Cancelar</button>
+        </div>
     </div>
     
     <script>
         let scanner = null;
-        let registros = JSON.parse(localStorage.getItem('pecas_coletadas')) || [];
+        let registros = JSON.parse(localStorage.getItem('pecas_atendimento')) || [];
+        let lotesFechados = JSON.parse(localStorage.getItem('lotes_consolidados')) || [];
         atualizarContador();
 
-        // Passo 1: Validação da RAT
+        // Validação da RAT
         document.getElementById('rat').addEventListener('blur', function() {
             if(this.value.trim() !== '') {
                 document.getElementById('codPeca').disabled = false;
                 document.getElementById('codPeca').focus();
             }
         });
-            
-        // Passo 2: Validação do Código da Peça e Ativação da câmera
+
+        // Validação do Código da Peça e ativação da câmera
         document.getElementById('codPeca').addEventListener('blur', function() {
             if(this.value.trim() !== '') {
                 document.getElementById('serial').disabled = false;
@@ -109,14 +146,11 @@
             }   
         });
 
-        // Passo 3: Sucesso na Leitura do Código de Barras / QR Code
         function onScanSuccess(text) {
             document.getElementById('serial').value = text;
             document.getElementById('btnSalvar').disabled = false;
             
-            if(navigator.vibrate) {
-                navigator.vibrate(50);
-            }
+            if(navigator.vibrate) navigator.vibrate(50);
 
             if (scanner) {
                 scanner.clear().catch(error => console.error("Erro ao limpar leitor", error));
@@ -124,23 +158,34 @@
             }
         }
 
-        function onScanError(errorMessage) {
-            // Ignora quadros vazios da varredura contínua
-        }
+        function onScanError(errorMessage) {}
 
-        function salvarLocal() {
+        // Salva o atendimento bruto recolhido em campo (Sem precisar saber o lote ainda)
+        function salvarRegistro() {
+            const rat = document.getElementById('rat').value;
+            const codPeca = document.getElementById('codPeca').value;
+            const serial = document.getElementById('serial').value;
+
+            if(!rat || !codPeca || !serial) {
+                alert('Preencha todos os campos e capture o serial!');
+                return;
+            }
+
             const novo = {
+                id: Date.now() + Math.random(),
                 data: new Date().toLocaleString(),
-                rat: document.getElementById('rat').value,
-                codPeca: document.getElementById('codPeca').value,
-                serial: document.getElementById('serial').value
+                rat: rat,
+                codPeca: codPeca,
+                serial: serial
             };
+
             registros.push(novo);
-            localStorage.setItem('pecas_coletadas', JSON.stringify(registros));
+            localStorage.setItem('pecas_atendimento', JSON.stringify(registros));
             atualizarContador();
             
-            alert('Peça salva com sucesso no aparelho!');
+            alert('Peça salva no histórico!');
 
+            // Limpa para o próximo atendimento
             document.getElementById('rat').value = '';
             document.getElementById('codPeca').value = '';
             document.getElementById('codPeca').disabled = true;
@@ -155,27 +200,117 @@
             document.getElementById('contador').innerText = registros.length;
         }
 
-        function exportarCSV() {
-            if(registros.length === 0) {
-                alert('Não há registros salvos para exportar!');
+        function abrirModalLote() {
+            if(registros.length === 0 && lotesFechados.length === 0) {
+                alert('Não há peças acumuladas.');
                 return;
             }
-            let csv = "Data,RAT,CodigoPeca,Serial\n";
-            registros.forEach(r => {
-                csv += `"${r.data}","${r.rat}","${r.codPeca}","${r.serial}"\n`;
+
+            const container = document.getElementById('listaPecasModal');
+            container.innerHTML = '';
+
+            if(registros.length === 0) {
+                container.innerHTML = '<p style="text-align:center; color:#666;">Todas as peças já foram distribuídas em lotes. Clique em exportar abaixo.</p>';
+            } else {
+                registros.forEach(r => {
+                    container.innerHTML += `
+                        <div class="item-check">
+                            <input type="checkbox" value="${r.id}" id="chk_${r.id}">
+                            <label for="chk_${r.id}" style="margin:0; display:inline; font-weight:normal;">
+                                <b>RAT:</b> ${r.rat} | <b>Peça:</b> ${r.codPeca} | <b>Serial:</b> ${r.serial}
+                            </label>
+                        </div>
+                    `;
+                });
+            }
+
+            document.getElementById('modalLote').style.display = 'flex';
+        }
+
+        function fecharModalLote() {
+            document.getElementById('modalLote').style.display = 'none';
+            // Se já tiver itens consolidados, oferece para exportar
+            if(lotesFechados.length > 0) {
+                exportarCSVFinal();
+            }
+        }
+
+        function salvarLoteAtual() {
+            const tecnico = document.getElementById('tecnico').value;
+            const loteNum = document.getElementById('modalLoteNum').value;
+            const tipoLote = document.getElementById('modalTipoLote').value;
+
+            if(!tecnico) {
+                alert('Preencha o Nome do Técnico no topo da tela principal antes!');
+                return;
+            }
+            if(!loteNum) {
+                alert('Informe o Número do Lote fornecido pela empresa!');
+                return;
+            }
+
+            // Pega todos os checkboxes marcados
+            const checkboxes = document.querySelectorAll('#listaPecasModal input[type="checkbox"]:checked');
+            if(checkboxes.length === 0) {
+                alert('Selecione ao menos uma peça para este lote.');
+                return;
+            }
+
+            const idsSelecionados = Array.from(checkboxes).map(chk => Number(chk.value));
+
+            // Separa as peças selecionadas e envia para os lotes fechados
+            const pecasDoLote = registros.filter(r => idsSelecionados.includes(r.id));
+            pecasDoLote.forEach(p => {
+                lotesFechados.push({
+                    data: p.data,
+                    tecnico: tecnico,
+                    lote: loteNum,
+                    tipoLote: tipoLote,
+                    codPeca: p.codPeca,
+                    qtd: 1,
+                    rat: p.rat,
+                    serial: p.serial
+                });
             });
+
+            // Remove as peças selecionadas da lista de pendentes
+            registros = registros.filter(r => !idsSelecionados.includes(r.id));
+            
+            // Salva no armazenamento local
+            localStorage.setItem('pecas_atendimento', JSON.stringify(registros));
+            localStorage.setItem('lotes_consolidados', JSON.stringify(lotesFechados));
+            
+            atualizarContador();
+            alert(`Lote ${loteNum} vinculado com sucesso! Você pode cadastrar outro lote ou fechar para exportar.`);
+            
+            document.getElementById('modalLoteNum').value = '';
+            abrirModalLote(); // Atualiza a lista na tela
+        }
+
+        function exportarCSVFinal() {
+            if(lotesFechados.length === 0) {
+                alert('Nenhum lote foi fechado/vinculado ainda.');
+                return;
+            }
+
+            let csv = "Data,Tecnico,Lote,TipoLote,CodigoPeca,QTD,RAT,Serial\n";
+            lotesFechados.forEach(r => {
+                csv += `"${r.data}","${r.tecnico}","${r.lote}","${r.tipoLote}","${r.codPeca}","${r.qtd}","${r.rat}","${r.serial}"\n`;
+            });
+
             const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `relatorio_pecas_${new Date().toISOString().slice(0, 10)}.csv`;
+            a.download = `checklist_remessa_semanal_${new Date().toISOString().slice(0, 10)}.csv`;
             a.click();
         }
 
         function limparDados() {
-            if(window.confirm('Tem certeza que deseja apagar todos os registros salvos neste aparelho?')) {
+            if(window.confirm('Tem certeza que deseja apagar todo o histórico de atendimentos e lotes?')) {
                 localStorage.clear();
                 registros = [];
+                lotesFechados = [];
                 atualizarContador();
                 alert('Histórico apagado com sucesso!');
             }

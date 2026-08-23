@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>HKByte - Coleta de Peças</title>
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    <style>
+        body { font-family: 'Segoe UI', Arial, sans-serif; padding: 15px; background: #f4f6f9; max-width: 500px; margin: auto; color: #333; }
+        h2 { text-align: center; color: #2c3e50; margin-bottom: 20px; }
+        .form-group { margin-bottom: 15px; background: #fff; padding: 12px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        label { display: block; font-weight: bold; margin-bottom: 5px; color: #2c3e50; font-size: 14px;}
+        input { width: 100%; padding: 12px; box-sizing: border-box; font-size: 16px; border: 1px solid #ccc; border-radius: 6px; }
+        input:disabled { background-color: #e9ecef; }
+        button { background: #2c3e50; color: white; padding: 14px; border: none; width: 100%; font-size: 16px; font-weight: bold; border-radius: 6px; cursor: pointer; margin-top: 10px; }
+        button#btnExport { background: #27ae60;}
+        button:disabled { background: #bdc3c7; cursor: not-allowed; }
+        #reader { width: 100%; margin: 10px auto; display: none; border-radius: 8px; overflow: hidden; border: 2px solid #2c3e50; }
+        .stats { margin-top: 20px; padding: 15px; background: #fff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); text-align: center; }
+        .stats p {font-size: 16px; font-weight: bold; margin-bottom: 10px;}
+    </style>
+</head>
+<body>
+    <h2>HKByte - Coleta de Peças</h2>
+
+    <!-- Passo 1: RAT -->
+    <div class="form-group">
+        <label>1. Número do RAT:</label>
+        <input type="text" id="rat" placeholder="Digite a RAT e toque fora">
+    </div>
+
+    <!-- Passo 2: Código da Peça -->
+    <div class="form-group">
+        <label>2. Código da Peça:</label>
+        <input type="text" id="codPeca" placeholder="Código do fabricante" disabled>
+    </div>
+
+    <!-- Passo 3: Leitura de Serial -->
+    <div class="form-group">
+        <label>3. Número de Série (Serial):</label>
+        <input type="text" id="serial" placeholder="Aguardando leitura da câmera..." disabled>
+    </div>
+
+    <!-- Passo 4: Leitura de QR Code -->
+    <div id="reader"></div>
+    <button id="btnSalvar" onclick="salvarLocal()" disabled>Salvar Registro no Celular</button>
+
+    <div class="stats">
+        <p>Registros salvos offline: <span id="contador">0</span></p>
+        <button id="btnExport" onclick="exportarCSV()">Exportar Planilha (CSV)</button>
+        <button id="btnLimpar" onclick="LimparDados()" style="background: #e74c3c; margin-top: 8px;">Apagar Histórico</button>
+    </div>
+    
+    <script>
+        let scanner = null;
+        let registros = JSON.parse(localStorage.getItem('pecas_coletadas')) || [];
+        atualizarContador();
+
+        // Passo 1: Validação da RAT
+        document.getElementById('rat').addEventListener('blur', function() {
+            if(this.value.trim() !== '') {
+                document.getElementById('codPeca').disabled = false;
+                document.getElementById('codPeca').focus();
+            }
+        });
+            
+        // Passo 2: Validação do Código da Peça e Ativação da câmera
+        document.getElementById('codPeca').addEventListener('blur', function() {
+            if(this.value.trim() !== '') {
+                document.getElementById('serial').disabled = false;
+                document.getElementById('reader').style.display = 'block';
+                
+                if(!scanner) {
+                    // Configuração corrigida para o leitor HTML5
+                    scanner = new Html5QrcodeScanner("reader", { 
+                        fps: 15, 
+                        qrbox: { width: 250, height: 120 } 
+                    }, false);
+                    scanner.render(onScanSuccess);
+                }
+            }   
+        });
+
+        // Passo 3: Sucesso na Leitura do Código de Barras / QR Code
+        function onScanSuccess(text) {
+            document.getElementById('serial').value = text;
+            document.getElementById('btnSalvar').disabled = false;
+            
+            // Feedback tátil leve se suportado pelo aparelho
+            if(navigator.vibrate) {
+                navigator.vibrate(50);
+            }
+        }
+
+        // Salvar localmente no dispositivo (Fora da função de scan)
+        function salvarLocal() {
+            const novo = {
+                data: new Date().toLocaleString(),
+                rat: document.getElementById('rat').value,
+                codPeca: document.getElementById('codPeca').value,
+                serial: document.getElementById('serial').value
+            };
+            registros.push(novo);
+            localStorage.setItem('pecas_coletadas', JSON.stringify(registros));
+            atualizarContador();
+            
+            alert('Peça salva com sucesso no aparelho!');
+
+            // Reseta os campos para o próximo atendimento
+            document.getElementById('rat').value = '';
+            document.getElementById('codPeca').value = '';
+            document.getElementById('codPeca').disabled = true;
+            document.getElementById('serial').value = '';
+            document.getElementById('serial').disabled = true;
+            document.getElementById('reader').style.display = 'none';
+            document.getElementById('btnSalvar').disabled = true;
+            document.getElementById('rat').focus();
+        }
+
+        // Contador de Registros
+        function atualizarContador() {
+            document.getElementById('contador').innerText = registros.length;
+        }
+
+        // Exportação do relatório acumulado
+        function exportarCSV() {
+            if(registros.length === 0) { // Corrigido de 'reistros' para 'registros'
+                alert('Não há registros salvos para exportar!');
+                return;
+            }
+            let csv = "Data,RAT,CodigoPeca,Serial\n";
+            registros.forEach(r => {
+                csv += `"${r.data}","${r.rat}","${r.codPeca}","${r.serial}"\n`;
+            });
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            // Corrigido para usar crases (``) para interpolação da data
+            a.download = `relatorio_pecas_${new Date().toISOString().slice(0, 10)}.csv`;
+            a.click();
+        }
+
+        // Limpa os dados salvos
+        function LimparDados() {
+            if(window.confirm('Tem certeza que deseja apagar todos os registros salvos neste aparelho?')) {
+                localStorage.clear();
+                registros = [];
+                atualizarContador();
+                alert('Histórico apagado com sucesso!');
+            }
+        }
+    </script>
+</body>
+</html>

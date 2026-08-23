@@ -30,7 +30,6 @@
         .stats { margin-top: 20px; padding: 15px; background: #fff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); text-align: center; }
         .stats p { font-size: 15px; font-weight: bold; margin-bottom: 10px; }
 
-        /* Estilo da Janela Modal de Fechamento de Lotes */
         #modalLote {
             display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.7); justify-content: center; align-items: center;
@@ -82,7 +81,7 @@
 
     <div class="stats">
         <p>Peças acumuladas: <span id="contador">0</span></p>
-        <button id="btnFecharLote" onclick="abrirModalLote()">📦 Fechar Lotes (Semanal)</button>
+        <button id="btnFecharLote" onclick="abrirModalLote()">📦 Fechar Lote / Gerar Termo PDF</button>
         <button id="btnLimpar" onclick="limparDados()" style="background: #e74c3c; margin-top: 8px;">Apagar Histórico</button>
     </div>
 
@@ -98,21 +97,21 @@
             </div>
 
             <div class="form-group">
-                <label>Tipo de Lote:</label>
+                <label>Tipo de Lote[cite: 2]:</label>
                 <select id="modalTipoLote">
-                    <option value="USADO">USADO</option>
-                    <option value="NOVA">NOVA</option>
-                    <option value="RMDF">RMDF</option>
+                    <option value="USADO">USADO[cite: 2]</option>
+                    <option value="NOVA">NOVA[cite: 2]</option>
+                    <option value="RMDF">RMDF[cite: 2]</option>
                 </select>
             </div>
 
             <label style="margin-top: 15px; font-weight: bold; color: #2c3e50;">Selecione as peças deste lote:</label>
             <div id="listaPecasModal" style="max-height: 180px; overflow-y: auto; border: 1px solid #ccc; padding: 5px; border-radius: 6px; margin-bottom: 10px;">
-                <!-- As peças pendentes aparecem aqui dinamicamente -->
             </div>
 
-            <button onclick="salvarLoteAtual()" style="background: #27ae60; margin-top:5px;">Vincular Lote e Gerar Planilha</button>
-            <button onclick="fecharModalLote()" style="background: #7f8c8d; margin-top:5px;">Fechar / Cancelar</button>
+            <button onclick="salvarLoteAtual()" style="background: #27ae60; margin-top:5px;">Vincular Lote</button>
+            <button onclick="gerarDocumentoOFICIAL()" style="background: #2980b9; margin-top:5px;">📄 Gerar Termo da Empresa (PDF/Imprimir)</button>
+            <button onclick="fecharModalLote()" style="background: #7f8c8d; margin-top:5px;">Cancelar</button>
         </div>
     </div>
     
@@ -122,7 +121,6 @@
         let lotesFechados = JSON.parse(localStorage.getItem('lotes_consolidados')) || [];
         atualizarContador();
 
-        // Validação da RAT
         document.getElementById('rat').addEventListener('blur', function() {
             if(this.value.trim() !== '') {
                 document.getElementById('codPeca').disabled = false;
@@ -130,7 +128,6 @@
             }
         });
 
-        // Validação do Código da Peça e ativação da câmera
         document.getElementById('codPeca').addEventListener('blur', function() {
             if(this.value.trim() !== '') {
                 document.getElementById('serial').disabled = false;
@@ -160,7 +157,6 @@
 
         function onScanError(errorMessage) {}
 
-        // Salva o atendimento bruto recolhido em campo (Sem precisar saber o lote ainda)
         function salvarRegistro() {
             const rat = document.getElementById('rat').value;
             const codPeca = document.getElementById('codPeca').value;
@@ -185,7 +181,6 @@
             
             alert('Peça salva no histórico!');
 
-            // Limpa para o próximo atendimento
             document.getElementById('rat').value = '';
             document.getElementById('codPeca').value = '';
             document.getElementById('codPeca').disabled = true;
@@ -210,7 +205,7 @@
             container.innerHTML = '';
 
             if(registros.length === 0) {
-                container.innerHTML = '<p style="text-align:center; color:#666;">Todas as peças já foram distribuídas em lotes. Clique em exportar abaixo.</p>';
+                container.innerHTML = '<p style="text-align:center; color:#666;">Todas as peças já foram distribuídas em lotes. Clique abaixo para gerar o termo final.</p>';
             } else {
                 registros.forEach(r => {
                     container.innerHTML += `
@@ -229,10 +224,6 @@
 
         function fecharModalLote() {
             document.getElementById('modalLote').style.display = 'none';
-            // Se já tiver itens consolidados, oferece para exportar
-            if(lotesFechados.length > 0) {
-                exportarCSVFinal();
-            }
         }
 
         function salvarLoteAtual() {
@@ -241,24 +232,22 @@
             const tipoLote = document.getElementById('modalTipoLote').value;
 
             if(!tecnico) {
-                alert('Preencha o Nome do Técnico no topo da tela principal antes!');
+                alert('Preencha o Nome do Técnico no topo antes!');
                 return;
             }
             if(!loteNum) {
-                alert('Informe o Número do Lote fornecido pela empresa!');
+                alert('Informe o Número do Lote!');
                 return;
             }
 
-            // Pega todos os checkboxes marcados
             const checkboxes = document.querySelectorAll('#listaPecasModal input[type="checkbox"]:checked');
             if(checkboxes.length === 0) {
-                alert('Selecione ao menos uma peça para este lote.');
+                alert('Selecione ao menos uma peça.');
                 return;
             }
 
             const idsSelecionados = Array.from(checkboxes).map(chk => Number(chk.value));
 
-            // Separa as peças selecionadas e envia para os lotes fechados
             const pecasDoLote = registros.filter(r => idsSelecionados.includes(r.id));
             pecasDoLote.forEach(p => {
                 lotesFechados.push({
@@ -273,41 +262,105 @@
                 });
             });
 
-            // Remove as peças selecionadas da lista de pendentes
             registros = registros.filter(r => !idsSelecionados.includes(r.id));
             
-            // Salva no armazenamento local
             localStorage.setItem('pecas_atendimento', JSON.stringify(registros));
             localStorage.setItem('lotes_consolidados', JSON.stringify(lotesFechados));
             
             atualizarContador();
-            alert(`Lote ${loteNum} vinculado com sucesso! Você pode cadastrar outro lote ou fechar para exportar.`);
+            alert(`Lote ${loteNum} vinculado!`);
             
             document.getElementById('modalLoteNum').value = '';
-            abrirModalLote(); // Atualiza a lista na tela
+            abrirModalLote();
         }
 
-        function exportarCSVFinal() {
+        // Gera exatamente a estrutura física do CHECKLIST DE ENTREGA enviado (Sem logos)
+        function gerarDocumentoOFICIAL() {
             if(lotesFechados.length === 0) {
-                alert('Nenhum lote foi fechado/vinculado ainda.');
+                alert('Vincule ao menos um lote antes de gerar o termo!');
                 return;
             }
 
-            let csv = "Data,Tecnico,Lote,TipoLote,CodigoPeca,QTD,RAT,Serial\n";
-            lotesFechados.forEach(r => {
-                csv += `"${r.data}","${r.tecnico}","${r.lote}","${r.tipoLote}","${r.codPeca}","${r.qtd}","${r.rat}","${r.serial}"\n`;
+            const tecnico = lotesFechados[0].tecnico;
+            
+            let htmlDocumento = `
+            <!DOCTYPE html>
+            <html lang="pt-br">
+            <head>
+                <meta charset="UTF-8">
+                <title>CHECKLIST DE ENTREGA</title>
+                <style>
+                    body { font-family: Arial, sans-serif; padding: 20px; color: #000; font-size: 12px; }
+                    h2 { text-align: center; font-size: 16px; margin-bottom: 20px; text-transform: uppercase; }
+                    .header-doc { font-size: 14px; margin-bottom: 20px; }
+                    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+                    th, td { border: 1px solid #000; padding: 6px; text-align: center; }
+                    th { font-weight: bold; background: #f2f2f2; }
+                    .text-left { text-align: left; }
+                </style>
+            </head>
+            <body>
+                <h2>CHECKLIST DE ENTREGA</h2>
+                <div class="header-doc">
+                    Eu, técnico <u>&nbsp;&nbsp;<b>${tecnico}</b>&nbsp;&nbsp;</u> declaro estar entregando as peças abaixo:
+                </div>
+                
+                <table>
+                    <thead>
+                        <tr>
+                            <th>LOTE</th>
+                            <th>CÓDIGO</th>
+                            <th>TIPO DE LOTE</th>
+                            <th>QTD</th>
+                            <th>VALIDAÇÃO</th>
+                            <th>OBSERVAÇÃO</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            lotesFechados.forEach(item => {
+                htmlDocumento += `
+                    <tr>
+                        <td>${item.lote}</td>
+                        <td>${item.codPeca}</td>
+                        <td>${item.tipoLote}</td>
+                        <td>${item.qtd}</td>
+                        <td>SIM [ ] NÃO [ ]</td>
+                        <td class="text-left">RAT: ${item.rat} | Serial: ${item.serial}</td>
+                    </tr>
+                `;
             });
 
-            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `checklist_remessa_semanal_${new Date().toISOString().slice(0, 10)}.csv`;
-            a.click();
+            // Preenche linhas em branco adicionais se necessário para manter o padrão físico
+            for(let i = lotesFechados.length; i < 15; i++) {
+                htmlDocumento += `
+                    <tr>
+                        <td>&nbsp;</td>
+                        <td>&nbsp;</td>
+                        <td>USADO &nbsp; NOVA &nbsp; RMDF</td>
+                        <td>&nbsp;</td>
+                        <td>SIM [ ] NÃO [ ]</td>
+                        <td>&nbsp;</td>
+                    </tr>
+                `;
+            }
+
+            htmlDocumento += `
+                    </tbody>
+                </table>
+                <script>window.print();<\/script>
+            </body>
+            </html>
+            `;
+
+            const novaJanela = window.open('', '_blank');
+            novaJanela.document.write(htmlDocumento);
+            novaJanela.document.close();
         }
 
         function limparDados() {
-            if(window.confirm('Tem certeza que deseja apagar todo o histórico de atendimentos e lotes?')) {
+            if(window.confirm('Tem certeza que deseja apagar todo o histórico acumulado?')) {
                 localStorage.clear();
                 registros = [];
                 lotesFechados = [];

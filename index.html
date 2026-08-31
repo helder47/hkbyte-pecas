@@ -23,7 +23,6 @@
         
         button { background: #1e3c72; color: white; padding: 14px; border: none; width: 100%; font-size: 16px; font-weight: bold; border-radius: 6px; cursor: pointer; margin-top: 10px; }
         button#btnFecharLote { background: #e67e22; }
-        button#btnExport { background: #27ae60; }
         button:disabled { background: #bdc3c7; cursor: not-allowed; }
         
         #reader { width: 100%; margin: 10px auto; display: none; border-radius: 8px; overflow: hidden; border: 2px solid #1e3c72; }
@@ -69,13 +68,24 @@
         <input type="text" id="codPeca" placeholder="Código do fabricante" disabled>
     </div>
 
-    <!-- Passo 3: Leitura de Serial -->
+    <!-- Passo 3: Pergunta sobre o Serial -->
     <div class="form-group">
-        <label>3. Número de Série (Serial) - Leitura:</label>
-        <input type="text" id="serial" placeholder="Aguardando leitura da câmera..." disabled>
+        <label>3. A peça possui Serial?</label>
+        <select id="temSerial" disabled onchange="tratarOpcaoSerial()">
+            <option value="">Selecione...</option>
+            <option value="SIM">Sim</option>
+            <option value="NAO">Não</option>
+        </select>
     </div>
 
+    <!-- Leitor de Câmera para o Serial (Aparece se for SIM) -->
     <div id="reader"></div>
+
+    <!-- Campo do Serial (Exibido preenchido após leitura ou se não tiver) -->
+    <div class="form-group" id="grupoSerial" style="display:none;">
+        <label id="labelSerial">Número de Série (Serial):</label>
+        <input type="text" id="serial" placeholder="Aguardando..." disabled>
+    </div>
     
     <button id="btnSalvar" onclick="salvarRegistro()" disabled>Salvar Peça no Histórico</button>
 
@@ -85,7 +95,7 @@
         <button id="btnLimpar" onclick="limparDados()" style="background: #e74c3c; margin-top: 8px;">Apagar Histórico</button>
     </div>
 
-    <!-- Janela Modal para Distribuir os Lotes Fornecidos pela Empresa -->
+    <!-- Janela Modal para Distribuir os Lotes -->
     <div id="modalLote">
         <div class="modal-content">
             <h3 style="margin-top:0; color:#1e3c72;">Atribuir Lotes da Semana</h3>
@@ -97,7 +107,7 @@
             </div>
 
             <div class="form-group">
-                <label>Tipo de Lote[cite: 2]:</label>
+                <label>Tipo de Lote:</label>
                 <select id="modalTipoLote">
                     <option value="USADO">USADO</option>
                     <option value="NOVA">NOVA</option>
@@ -121,6 +131,7 @@
         let lotesFechados = JSON.parse(localStorage.getItem('lotes_consolidados')) || [];
         atualizarContador();
 
+        // Passo 1: RAT
         document.getElementById('rat').addEventListener('blur', function() {
             if(this.value.trim() !== '') {
                 document.getElementById('codPeca').disabled = false;
@@ -128,10 +139,30 @@
             }
         });
 
+        // Passo 2: Código da Peça -> Libera a pergunta do Serial
         document.getElementById('codPeca').addEventListener('blur', function() {
             if(this.value.trim() !== '') {
-                document.getElementById('serial').disabled = false;
+                document.getElementById('temSerial').disabled = false;
+                document.getElementById('temSerial').focus();
+            }   
+        });
+
+        // Passo 3: Trata se tem ou não serial
+        function tratarOpcaoSerial() {
+            const opcao = document.getElementById('temSerial').value;
+            const grupoSerial = document.getElementById('grupoSerial');
+            
+            // Limpa estado anterior do leitor se houver
+            if(scanner) {
+                scanner.clear().catch(e => console.log(e));
+                scanner = null;
+            }
+            document.getElementById('reader').style.display = 'none';
+
+            if(opcao === 'SIM') {
+                grupoSerial.style.display = 'block';
                 document.getElementById('reader').style.display = 'block';
+                document.getElementById('labelSerial').innerText = "Escaneie o Número de Série:";
                 
                 if(!scanner) {
                     scanner = new Html5QrcodeScanner("reader", { 
@@ -140,8 +171,15 @@
                     }, false);
                     scanner.render(onScanSuccess, onScanError);
                 }
-            }   
-        });
+            } else if(opcao === 'NAO') {
+                grupoSerial.style.display = 'block';
+                document.getElementById('labelSerial').innerText = "Número de Série:";
+                document.getElementById('serial').value = "SEM SERIAL";
+                document.getElementById('btnSalvar').disabled = false;
+            } else {
+                grupoSerial.style.display = 'none';
+            }
+        }
 
         function onScanSuccess(text) {
             document.getElementById('serial').value = text;
@@ -162,8 +200,8 @@
             const codPeca = document.getElementById('codPeca').value;
             const serial = document.getElementById('serial').value;
 
-            if(!rat || !codPeca || !serial) {
-                alert('Preencha todos os campos e capture o serial!');
+            if(!rat || !codPeca) {
+                alert('Preencha a RAT e o Código da Peça!');
                 return;
             }
 
@@ -172,7 +210,7 @@
                 data: new Date().toLocaleString(),
                 rat: rat,
                 codPeca: codPeca,
-                serial: serial
+                serial: serial || "SEM SERIAL"
             };
 
             registros.push(novo);
@@ -181,11 +219,14 @@
             
             alert('Peça salva no histórico!');
 
+            // Reseta o formulário para o próximo atendimento
             document.getElementById('rat').value = '';
             document.getElementById('codPeca').value = '';
             document.getElementById('codPeca').disabled = true;
+            document.getElementById('temSerial').value = '';
+            document.getElementById('temSerial').disabled = true;
             document.getElementById('serial').value = '';
-            document.getElementById('serial').disabled = true;
+            document.getElementById('grupoSerial').style.display = 'none';
             document.getElementById('reader').style.display = 'none';
             document.getElementById('btnSalvar').disabled = true;
             document.getElementById('rat').focus();
@@ -274,7 +315,6 @@
             abrirModalLote();
         }
 
-        // Gera exatamente a estrutura física do CHECKLIST DE ENTREGA enviado (Sem logos)
         function gerarDocumentoOFICIAL() {
             if(lotesFechados.length === 0) {
                 alert('Vincule ao menos um lote antes de gerar o termo!');
@@ -332,7 +372,6 @@
                 `;
             });
 
-            // Preenche linhas em branco adicionais se necessário para manter o padrão físico
             for(let i = lotesFechados.length; i < 15; i++) {
                 htmlDocumento += `
                     <tr>

@@ -35,11 +35,16 @@ let scanner = null;
                 grupoSerial.style.display = 'block';
                 document.getElementById('reader').style.display = 'block';
                 document.getElementById('labelSerial').innerText = "Escaneie o Número de Série:";
+                document.getElementById('serial').value = '';
+                document.getElementById('btnSalvar').disabled = true;
                 
                 if(!scanner) {
                     scanner = new Html5QrcodeScanner("reader", { 
                         fps: 10, 
-                        qrbox: { width: 250, height: 120 } 
+                        qrbox: (viewfinderWidth, viewfinderHeight) => {
+                            const size = Math.min(300, Math.floor(Math.min(viewfinderWidth, viewfinderHeight) * 0.8));
+                            return { width: size, height: size };
+                        }
                     }, false);
                     scanner.render(onScanSuccess, onScanError);
                 }
